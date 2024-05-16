@@ -67,7 +67,7 @@ class BitMEXWebsocket(AsyncIOEventEmitter):
         self.emit('open')
 
     async def on_close(self):
-        alog.info("WebSocket closed")
+        alog.debug("WebSocket closed")
         self.emit('close')
 
     async def on_error(self, error):
@@ -77,7 +77,7 @@ class BitMEXWebsocket(AsyncIOEventEmitter):
     async def on_message(self, message):
         """Handler for parsing WS messages."""
         message = json.loads(message)
-        alog.info(message)
+        alog.debug(message)
         if 'error' in message:
             await self.on_error(message['error'])
 
@@ -103,11 +103,11 @@ class BitMEXWebsocket(AsyncIOEventEmitter):
     def header(self):
         """Return auth headers. Will use API Keys if present in settings."""
         auth_header = []
-        alog.info(f'### should auth {self.should_auth} ###')
+        alog.debug(f'### should auth {self.should_auth} ###')
 
         if self.should_auth:
-            alog.info("Authenticating with API Key.")
-            alog.info((settings.BITMEX_API_KEY, settings.BITMEX_API_SECRET))
+            alog.debug("Authenticating with API Key.")
+            alog.debug((settings.BITMEX_API_KEY, settings.BITMEX_API_SECRET))
 
             nonce = generate_nonce()
             api_signature = generate_signature(
@@ -119,7 +119,7 @@ class BitMEXWebsocket(AsyncIOEventEmitter):
                 "api-key:" + settings.BITMEX_API_KEY
             ]
 
-            alog.info(alog.pformat(auth_header))
+            alog.debug(alog.pformat(auth_header))
 
         return auth_header
 
