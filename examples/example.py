@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import asyncio
 import logging
 import signal
@@ -11,23 +13,16 @@ from bitmex_websocket.constants import InstrumentChannels
 class Ticker(Instrument):
     def __init__(self, symbol='XBTUSD', **kwargs):
         channels = [
-            InstrumentChannels.trade,
+            InstrumentChannels.quote,
         ]
         super().__init__(symbol=symbol, channels=channels, **kwargs)
 
     async def on_action(self, message):
-        alog.info(alog.pformat(message['data']))
-
-    async def on_open(self):
-        alog.debug("WebSocket opened.")
-        await self.subscribe_channels()
-
-    async def subscribe_channels(self):
-        for channel in self.channels:
-            channel_key = f'{channel.name}:{self.symbol}'
-            await self.subscribe(channel_key)
+        pass
+        # alog.info(alog.pformat(message['data']))
 
     async def run_forever(self):
+        self.on('action', self.on_action)
         await super().start()
 
 
@@ -46,9 +41,11 @@ if __name__ == '__main__':
 
     # Handle SIGINT and SIGTERM to gracefully shutdown
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, handle_signal, loop, sig)
+        loop.add_signal_handler(sig, lambda: asyncio.ensure_future(
+            loop.shutdown_asyncgens()))
 
     try:
         loop.run_until_complete(main())
     finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()

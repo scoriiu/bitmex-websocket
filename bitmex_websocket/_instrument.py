@@ -1,11 +1,13 @@
+#!/usr/bin/env python
+
 import asyncio
 import logging
 
-from bitmex_websocket._bitmex_websocket import BitMEXWebsocket
-from bitmex_websocket.constants import Channels, SecureChannels, \
-    SecureInstrumentChannels, InstrumentChannels
-import alog
 import click
+import alog
+from bitmex_websocket._bitmex_websocket import BitMEXWebsocket
+from bitmex_websocket.constants import InstrumentChannels, SecureChannels, \
+    SecureInstrumentChannels
 
 __all__ = ['Instrument']
 
@@ -20,8 +22,8 @@ class SubscribeToSecureChannelException(Exception):
 
 class Instrument(BitMEXWebsocket):
     def __init__(self, symbol: str = 'XBTUSD',
-                 channels: [Channels] or [str] = None, should_auth=False,
-                 **kwargs):
+                 channels: [InstrumentChannels] or [str] = None,
+                 should_auth=False, **kwargs):
         super().__init__(should_auth=should_auth, **kwargs)
 
         if channels is None:
@@ -33,6 +35,8 @@ class Instrument(BitMEXWebsocket):
             raise SubscribeToSecureChannelException()
 
         self.symbol = symbol
+        self.on('action', self.on_action)
+        self.on('open', self.subscribe_channels)
 
     async def run_forever(self):
         await super().start()

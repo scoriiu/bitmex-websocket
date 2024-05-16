@@ -2,10 +2,12 @@ import asyncio
 import json
 import logging
 import ssl
+import time
 from urllib.parse import urlparse
 
 import alog
 import websockets
+from pyee.asyncio import AsyncIOEventEmitter
 
 from bitmex_websocket.auth.api_key_auth import generate_nonce, \
     generate_signature
@@ -18,9 +20,10 @@ class BitMEXWebsocketConnectionError(Exception):
     pass
 
 
-class BitMEXWebsocket:
-    def __init__(self, should_auth=False, heartbeat=True, ping_interval=10,
-                 ping_timeout=9, **kwargs):
+class BitMEXWebsocket(AsyncIOEventEmitter):
+    def __init__(self, should_auth=False, heartbeat=True, ping_interval=5,
+                 ping_timeout=5, **kwargs):
+        super().__init__()
         self.ping_timeout = ping_timeout
         self.ping_interval = ping_interval
         self.should_auth = should_auth
@@ -37,8 +40,9 @@ class BitMEXWebsocket:
         return f"wss://{url_parts[1]}/realtime{query_string}"
 
     async def connect(self):
-        async with websockets.connect(self.url,
-                                      ssl=ssl.SSLContext()) as websocket:
+        async with websockets.connect(self.url, ssl=ssl.SSLContext(),
+                                      ping_interval=self.ping_interval,
+                                      ping_timeout=self.ping_timeout) as websocket:
             self.ws = websocket
             await self.on_open()
 
@@ -60,10 +64,11 @@ class BitMEXWebsocket:
 
     async def on_open(self):
         alog.debug("WebSocket opened.")
-        await self.subscribe_channels()
+        self.emit('open')
 
     async def on_close(self):
         alog.info("WebSocket closed")
+        self.emit('close')
 
     async def on_error(self, error):
         alog.error(f"WebSocket error: {error}")
@@ -72,22 +77,18 @@ class BitMEXWebsocket:
     async def on_message(self, message):
         """Handler for parsing WS messages."""
         message = json.loads(message)
-
+        alog.info(message)
         if 'error' in message:
             await self.on_error(message['error'])
 
         action = message.get('action')
 
         if action:
-            await self.on_action(message)
+            self.emit('action', message)
         elif 'subscribe' in message:
-            await self.on_subscribe(message)
+            self.emit('subscribe', message)
         elif 'status' in message:
-            await self.on_status(message)
-
-    async def on_pong(self, message):
-        timestamp = float(time.time() * 1000)
-        latency = timestamp - (self.last_ping_tm * 1000)
+            self.emit('status', message)
 
     async def subscribe(self, channel: str):
         subscription_msg = {"op": "subscribe", "args": [channel]}
@@ -99,7 +100,7 @@ class BitMEXWebsocket:
     def is_connected(self):
         return self.ws is not None and self.ws.open
 
-    async def header(self):
+    def header(self):
         """Return auth headers. Will use API Keys if present in settings."""
         auth_header = []
         alog.info(f'### should auth {self.should_auth} ###')
@@ -128,21 +129,11 @@ class BitMEXWebsocket:
         else:
             raise Exception('Unable to subscribe.')
 
-    async def on_action(self, message):
-        # Handle action message
-        pass
-
-    async def on_status(self, message):
-        # Handle status message
-        pass
-
-    async def subscribe_channels(self):
-        # Placeholder for subscribe_channels logic
-        pass
-
 
 async def main():
     ticker = BitMEXWebsocket()
+    ticker.on('open', ticker.subscribe_channels)
+    ticker.on('action', ticker.on_action)
     await ticker.start()
 
 
