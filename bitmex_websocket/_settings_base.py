@@ -13,7 +13,7 @@ BITMEX_API_SECRET = os.environ.get('BITMEX_API_SECRET')
 LOG_LEVEL = os.environ.get('LOG_LEVEL')
 
 if LOG_LEVEL is None:
-    LOG_LEVEL = logging.INFO
+    LOG_LEVEL = logging.DEBUG
 
 LOG_LEVEL = logging.getLevelName(LOG_LEVEL)
 
