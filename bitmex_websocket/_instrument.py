@@ -1,13 +1,11 @@
-#!/usr/bin/env python
-
+import asyncio
+import logging
 
 from bitmex_websocket._bitmex_websocket import BitMEXWebsocket
 from bitmex_websocket.constants import Channels, SecureChannels, \
     SecureInstrumentChannels, InstrumentChannels
-
 import alog
 import click
-import logging
 
 __all__ = ['Instrument']
 
@@ -21,11 +19,9 @@ class SubscribeToSecureChannelException(Exception):
 
 
 class Instrument(BitMEXWebsocket):
-    def __init__(self,
-                 symbol: str = 'XBTUSD',
-                 channels: [Channels] or [str] = None,
-                 should_auth=False, **kwargs):
-
+    def __init__(self, symbol: str = 'XBTUSD',
+                 channels: [Channels] or [str] = None, should_auth=False,
+                 **kwargs):
         super().__init__(should_auth=should_auth, **kwargs)
 
         if channels is None:
@@ -37,18 +33,16 @@ class Instrument(BitMEXWebsocket):
             raise SubscribeToSecureChannelException()
 
         self.symbol = symbol
-        self.on('action', self.on_action)
 
-    def run_forever(self, **kwargs):
-        self.on('open', self.subscribe_channels)
-        super().run_forever(**kwargs)
+    async def run_forever(self):
+        await super().start()
 
-    def subscribe_channels(self):
+    async def subscribe_channels(self):
         for channel in self.channels:
             channel_key = f'{channel.name}:{self.symbol}'
-            self.subscribe(channel_key)
+            await self.subscribe(channel_key)
 
-    def on_action(self, message):
+    async def on_action(self, message):
         alog.debug(alog.pformat(message))
 
     def _channels_contains_secure(self):
@@ -62,7 +56,6 @@ def main(symbol: str, **kwargs):
     alog.set_level(logging.DEBUG)
 
     channels = [
-        # InstrumentChannels.quote,
         InstrumentChannels.trade,
         InstrumentChannels.orderBookL2
     ]
@@ -72,7 +65,7 @@ def main(symbol: str, **kwargs):
         **kwargs
     )
 
-    instrument.run_forever()
+    asyncio.run(instrument.run_forever())
 
 
 if __name__ == '__main__':
